@@ -51,6 +51,20 @@ and give it a persistent disk mounted at `/srv/data` so found names survive rest
 
 Every push to that branch redeploys automatically.
 
+## Instagram home helper
+
+Instagram blocks lookups from hosting servers like Render's, so Instagram is checked from your own computer instead:
+
+1. On Render -> your service -> **Environment**, add:
+   - `HELPER_TOKEN` = a long random password you make up (letters + numbers)
+   - `HUNT_PLATFORMS` = `telegram` (the server stops trying Instagram itself)
+2. On a computer that stays on, with Python 3 installed, download `helper/ig_helper.py` and run:
+   ```bash
+   python3 ig_helper.py --server https://handlehunt.onrender.com --token YOUR_HELPER_TOKEN
+   ```
+3. It checks ~5 names a minute (names already free on Telegram first) and posts results to the site.
+   Live finds shows "🏠 Instagram helper online" while it runs.
+
 ## Settings (environment variables)
 
 | Variable | Default | Meaning |
@@ -65,6 +79,7 @@ Every push to that branch redeploys automatically.
 | `HUNT_BATCH` | 5 | names per round |
 | `HUNT_VARIANTS` | 1 | also hunt prefixed/suffixed variants |
 | `HUNT_PLATFORMS` | telegram,instagram | platforms the hunter checks |
+| `HELPER_TOKEN` | (unset) | enables the Instagram home helper |
 | `DB_PATH` | data/handlehunt.db | SQLite file |
 
 ## Result meanings

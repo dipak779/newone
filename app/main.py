@@ -4,6 +4,7 @@ Run:  uvicorn app.main:app --reload   then open http://localhost:8000
 """
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import threading
@@ -13,7 +14,7 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Body, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -38,6 +39,8 @@ HUNT_ENABLED = os.getenv("HUNT_ENABLED", "1") == "1"
 HUNT_INTERVAL = float(os.getenv("HUNT_INTERVAL_SECONDS", "60"))
 HUNT_BATCH = int(os.getenv("HUNT_BATCH", "5"))
 HUNT_VARIANTS = os.getenv("HUNT_VARIANTS", "1") == "1"  # also hunt getX / Xhq style names
+HELPER_TOKEN = os.getenv("HELPER_TOKEN", "")  # enables the home helper endpoints when set
+HELPER_PLATFORMS = ("instagram",)
 HUNT_PLATFORMS = [p for p in os.getenv("HUNT_PLATFORMS", "telegram,instagram").split(",") if p in finder.CHECKERS]
 
 PREFIXES = ["get", "the", "its", "im", "real", "hey", "mr"]
@@ -189,9 +192,61 @@ def available(platform: str | None = Query(None, pattern="^(telegram|instagram)$
     return {"items": app.state.store.available(platform, limit)}
 
 
+@app.get("/api/finds")
+def finds(platform: str | None = Query(None, pattern="^(telegram|instagram)$"),
+          limit: int = Query(300, ge=1, le=1000)):
+    """Names free on `platform` (or anywhere), with the yes/no status on every platform."""
+    return {"items": app.state.store.finds(platform, limit),
+            "platforms": [p for p in finder.CHECKERS
+                          if p in HUNT_PLATFORMS or (HELPER_TOKEN and p in HELPER_PLATFORMS)]}
+
+
+# ---------- home helper: a script on the owner's computer checks Instagram and reports back
+
+def require_helper(token: str | None) -> None:
+    if not HELPER_TOKEN:
+        raise HTTPException(404, "Helper is not enabled (set HELPER_TOKEN on the server).")
+    if not token or not hmac.compare_digest(token, HELPER_TOKEN):
+        raise HTTPException(401, "Bad helper token.")
+
+
+@app.get("/api/helper/next")
+def helper_next(platform: str = Query("instagram"), n: int = Query(5, ge=1, le=20),
+                x_helper_token: str | None = Header(None)):
+    require_helper(x_helper_token)
+    if platform not in HELPER_PLATFORMS:
+        raise HTTPException(400, "Unsupported platform.")
+    hunter: Hunter = app.state.hunter
+    app.state.helper_seen_at = time.time()
+    return {"names": hunter.next_batch(platforms=[platform], n=n, prefer_free_on="telegram")}
+
+
+@app.post("/api/helper/results")
+def helper_results(results: list[dict] = Body(...), x_helper_token: str | None = Header(None)):
+    require_helper(x_helper_token)
+    saved = 0
+    for r in results[:50]:
+        name, platform, status = str(r.get("username", "")).lower(), r.get("platform"), r.get("status")
+        if platform not in HELPER_PLATFORMS or status not in (finder.AVAILABLE, finder.TAKEN, finder.UNKNOWN):
+            continue
+        if not finder.IG_RULE.match(name):
+            continue
+        res = finder.Result(name, platform, status, str(r.get("detail", ""))[:200])
+        if status == finder.UNKNOWN:
+            app.state.store.save_unknown(res)
+        else:
+            app.state.store.save(res)
+            app.state.checker.cache.pop((name, platform), None)
+        saved += 1
+    app.state.helper_seen_at = time.time()
+    return {"saved": saved}
+
+
 @app.get("/api/hunter")
 def hunter_status():
-    return {**app.state.hunter.status(), "counts": app.state.store.counts(), "enabled": HUNT_ENABLED}
+    seen = getattr(app.state, "helper_seen_at", None)
+    return {**app.state.hunter.status(), "counts": app.state.store.counts(), "enabled": HUNT_ENABLED,
+            "helper": {"enabled": bool(HELPER_TOKEN), "last_seen_at": seen}}
 
 
 @app.get("/api/scan")

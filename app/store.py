@@ -83,6 +83,27 @@ class Store:
         with self.lock:
             return [dict(r) for r in self.db.execute(q, args)]
 
+    def finds(self, platform: str | None = None, limit: int = 300) -> list[dict]:
+        """Usernames AVAILABLE on `platform` (or on any platform), each with every platform's status."""
+        q = "SELECT username, MAX(first_free) AS found FROM checks WHERE status='AVAILABLE'"
+        args: list = []
+        if platform:
+            q += " AND platform=?"
+            args.append(platform)
+        q += " GROUP BY username ORDER BY found DESC LIMIT ?"
+        args.append(limit)
+        with self.lock:
+            rows = [dict(r) for r in self.db.execute(q, args)]
+        if not rows:
+            return []
+        with self.lock:
+            names = [r["username"] for r in rows]
+            st: dict[str, dict] = {}
+            q2 = f"SELECT username, platform, status, detail, checked_at FROM checks WHERE username IN ({','.join('?' * len(names))})"
+            for r in self.db.execute(q2, names):
+                st.setdefault(r[0], {})[r[1]] = {"status": r[2], "detail": r[3], "checked_at": r[4]}
+        return [{"username": r["username"], "found": r["found"], "platforms": st.get(r["username"], {})} for r in rows]
+
     def counts(self) -> dict[str, dict[str, int]]:
         out: dict[str, dict[str, int]] = {}
         with self.lock:

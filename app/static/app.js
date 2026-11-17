@@ -1,7 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-const state = { results: {}, order: [], platforms: [], filter: "all", running: null };
+const state = { results: {}, order: [], platforms: [], filter: "any", running: null };
 const SAVED_KEY = "handlehunt.saved";
 
 function loadSaved() {
@@ -130,7 +130,8 @@ function passes(name) {
 }
 function cell(r) {
   if (!r) return `<span class="st PENDING">checking</span>`;
-  return `<span class="st ${r.status}">${r.status.toLowerCase()}</span><span class="detail">${escapeHtml(r.detail)}${r.cached ? " · cached" : ""}</span>`;
+  const YN = { AVAILABLE: "✅ Yes, available", TAKEN: "❌ No, taken", FRAGMENT: "❌ No, sold on Fragment", INVALID: "❌ No, not allowed", UNKNOWN: "⏳ Couldn't check" };
+  return `<span class="st ${r.status}">${YN[r.status] || r.status}</span><span class="detail">${escapeHtml(r.detail)}${r.cached ? " · cached" : ""}</span>`;
 }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -146,7 +147,9 @@ function renderRows() {
     return `<tr class="${win ? "win" : ""}"><td class="name">@${escapeHtml(n)}</td>${cols}
       <td><button class="star ${saved.has(n) ? "on" : ""}" data-n="${escapeHtml(n)}" title="Save">★</button></td></tr>`;
   });
-  $("#rows").innerHTML = rows.join("") || `<tr><td colspan="4" class="muted">Nothing matches this filter yet.</td></tr>`;
+  const scanning = Object.values(state.results).some((r) => state.platforms.some((p) => !r[p]));
+  $("#rows").innerHTML = rows.join("") || `<tr><td colspan="4" class="muted">${
+    scanning ? "Checking… free names will appear here." : "None of these are free. Tap “All” to see the taken ones."}</td></tr>`;
   const all = Object.values(state.results).flatMap((r) => Object.values(r));
   $("#summary").textContent = `· ${all.filter(isFree).length} free of ${all.length} checks`;
 }

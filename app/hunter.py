@@ -44,9 +44,13 @@ class Hunter:
         now = now or time.time()
         return [p for p in self.platforms if self.paused_until[p] <= now]
 
-    def next_batch(self, now: float | None = None) -> list[str]:
+    def next_batch(self, now: float | None = None, platforms: list[str] | None = None,
+                   n: int | None = None, prefer_free_on: str | None = None) -> list[str]:
+        """Pick the next names to check on `platforms` (default: the hunter's active ones).
+        prefer_free_on: put never-checked names that are already AVAILABLE on that platform first."""
         now = now or time.time()
-        platforms = self.active_platforms(now)
+        platforms = platforms if platforms is not None else self.active_platforms(now)
+        n = n or self.batch
         if not platforms:
             return []
         seen = self.store.statuses(self.pool)
@@ -63,9 +67,11 @@ class Hunter:
                 stale_free.append((oldest, name))
             elif now - oldest > self.recheck_all:
                 stale.append((oldest, name))
-        picks = fresh[: self.batch]
+        if prefer_free_on:
+            fresh.sort(key=lambda nm: seen.get(nm, {}).get(prefer_free_on, ("",))[0] != "AVAILABLE")
+        picks = fresh[:n]
         for group in (sorted(stale_free), sorted(stale)):
-            picks += [n for _, n in group][: self.batch - len(picks)]
+            picks += [nm for _, nm in group][: n - len(picks)]
         return picks
 
     # ---- running

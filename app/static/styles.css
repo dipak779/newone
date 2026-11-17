@@ -123,3 +123,9 @@ footer { text-align: center; margin-top: 20px; }
 .find .m { flex-direction: column; align-items: flex-start; gap: 6px; }
 .find a.pf { font-size: 12px; white-space: nowrap; }
 .pfs { flex-wrap: nowrap; }
+
+.pl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+.find a.pf, .find .pf { font-size: 12px; white-space: nowrap; }
+.find .pf.dim { color: var(--muted); padding: 1px 8px; border: 1px solid transparent; }
+.yn { font-weight: 600; font-size: 12px; white-space: nowrap; }
+.yn.yes { color: var(--green); } .yn.no { color: #a1a7b8; } .yn.wait { color: var(--muted); font-weight: 500; }

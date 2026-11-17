@@ -17,7 +17,7 @@
     try {
       const [h, a] = await Promise.all([
         fetch("/api/hunter").then((r) => r.json()),
-        fetch("/api/available?limit=300" + (platform ? `&platform=${platform}` : "")).then((r) => r.json()),
+        fetch("/api/finds?limit=300" + (platform ? `&platform=${platform}` : "")).then((r) => r.json()),
       ]);
       el("#liveDot").classList.toggle("on", h.running);
       el("#hunterInfo").textContent = h.running
@@ -27,24 +27,37 @@
           Object.entries(h.paused || {}).map(([p, sec]) =>
             ` · ⏸ ${p[0].toUpperCase() + p.slice(1)} is blocking requests, retrying in ${Math.ceil(sec / 60)} min`).join("")
         : "Background hunter is off (set HUNT_ENABLED=1). Showing names found by scans.";
-      // one card per username, listing every platform where it's free
-      const byName = new Map();
-      for (const i of a.items) {
-        const g = byName.get(i.username) || { username: i.username, found: 0, platforms: [] };
-        g.platforms.push(i);
-        g.platforms.sort((x, y) => (x.platform > y.platform ? -1 : 1)); // telegram first
-        g.found = Math.max(g.found, i.first_free || i.checked_at);
-        byName.set(i.username, g);
+      if (h.helper && h.helper.enabled) {
+        const on = h.helper.last_seen_at && Date.now() / 1000 - h.helper.last_seen_at < 300;
+        el("#hunterInfo").textContent += on ? " · 🏠 Instagram helper online" : " · 🏠 Instagram helper offline";
       }
-      const groups = [...byName.values()].sort((x, y) => y.found - x.found);
-      el("#liveCount").textContent = `· ${groups.length} names`;
-      const badge = (i) => `<a class="pf" href="${link(i)}" target="_blank" rel="noopener">${i.platform === "telegram" ? "✈️ Telegram" : "📸 Instagram"}</a>`;
+      // one card per name that's free somewhere, with a yes/no line for every platform
+      const groups = a.items;
+      const shown = a.platforms.length ? a.platforms : ["telegram", "instagram"];
+      el("#liveCount").textContent = `· ${groups.length} free names`;
+      const LABEL = { telegram: "✈️ Telegram", instagram: "📸 Instagram" };
+      const verdict = (st) => {
+        if (!st) return `<span class="yn wait">⏳ Not checked yet</span>`;
+        if (st.status === "AVAILABLE") return `<span class="yn yes">✅ Available</span>`;
+        if (st.status === "TAKEN") return `<span class="yn no">❌ Taken</span>`;
+        if (st.status === "FRAGMENT") return `<span class="yn no">❌ Sold on Fragment</span>`;
+        if (st.status === "INVALID") return `<span class="yn no">❌ Not allowed</span>`;
+        return `<span class="yn wait">⏳ Couldn't check</span>`;
+      };
+      const line = (g, p) => {
+        const st = g.platforms[p];
+        const name = st && st.status === "AVAILABLE"
+          ? `<a class="pf" href="${link({ platform: p, username: g.username })}" target="_blank" rel="noopener">${LABEL[p]}</a>`
+          : `<span class="pf dim">${LABEL[p]}</span>`;
+        return `<span class="pl">${name}${verdict(st)}</span>`;
+      };
       el("#liveList").innerHTML = groups.length
         ? groups.map((g) => `<div class="find${seen && !seen.has(g.username) ? " new" : ""}">
             <span class="h">@${esc(g.username)}</span>
-            <span class="m"><span class="pfs">${g.platforms.map(badge).join("")}</span><span>found ${ago(g.found)}</span></span>
+            ${shown.map((p) => line(g, p)).join("")}
+            <span class="m">found ${ago(g.found)}</span>
           </div>`).join("")
-        : `<span class="muted small">Nothing found yet — the hunter adds names here as it finds them.</span>`;
+        : `<span class="muted small">Nothing free found yet — names appear here as soon as the hunter finds them.</span>`;
       seen = new Set(groups.map((g) => g.username));
     } catch {
       el("#hunterInfo").textContent = "Can't reach the server.";

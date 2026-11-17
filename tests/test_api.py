@@ -124,3 +124,28 @@ def test_blocked_platform_is_paused_and_others_continue():
     h.run_round()  # instagram paused: telegram keeps going on NEW names
     assert set(calls) == {"telegram"} and len(calls) == 5
     assert len(store.available("telegram")) == 10
+
+
+def test_finds_and_helper(monkeypatch):
+    c = client()
+    c.get("/api/scan", params={"names": "therapy,money", "platforms": "telegram"})
+    items = c.get("/api/finds").json()["items"]
+    assert [i["username"] for i in items] == ["therapy"]
+    assert items[0]["platforms"]["telegram"]["status"] == "AVAILABLE"
+
+    assert c.get("/api/helper/next").status_code == 404  # disabled without a token
+    monkeypatch.setattr(main, "HELPER_TOKEN", "s3cret")
+    assert c.get("/api/helper/next", headers={"X-Helper-Token": "nope"}).status_code == 401
+    h = {"X-Helper-Token": "s3cret"}
+    main.app.state.hunter = main.Hunter(["money", "therapy", "pleased"], main.app.state.checker.check,
+                                        main.app.state.store, ["telegram"])
+    names = c.get("/api/helper/next", params={"n": 2}, headers=h).json()["names"]
+    assert names[0] == "therapy"  # free on Telegram -> checked on Instagram first
+    r = c.post("/api/helper/results", headers=h, json=[
+        {"username": "therapy", "platform": "instagram", "status": "TAKEN", "detail": "9 followers"},
+        {"username": "bad name!", "platform": "instagram", "status": "AVAILABLE"},
+        {"username": "x", "platform": "telegram", "status": "AVAILABLE"},
+    ])
+    assert r.json()["saved"] == 1
+    items = c.get("/api/finds").json()["items"]
+    assert items[0]["platforms"]["instagram"]["status"] == "TAKEN"
