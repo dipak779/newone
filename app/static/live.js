@@ -23,7 +23,9 @@
       el("#hunterInfo").textContent = h.running
         ? `Hunting every ${Math.round(h.interval_seconds)}s · ${h.pool_checked}/${h.pool_size} names checked` +
           (h.last_round_at ? ` · last round ${ago(h.last_round_at)}: ${h.last_batch.map((n) => "@" + n).join(", ")}` : " · first round starting…") +
-          (h.last_error ? ` · error: ${h.last_error}` : "")
+          (h.last_error ? ` · error: ${h.last_error}` : "") +
+          Object.entries(h.paused || {}).map(([p, sec]) =>
+            ` · ⏸ ${p[0].toUpperCase() + p.slice(1)} is blocking requests, retrying in ${Math.ceil(sec / 60)} min`).join("")
         : "Background hunter is off (set HUNT_ENABLED=1). Showing names found by scans.";
       // one card per username, listing every platform where it's free
       const byName = new Map();

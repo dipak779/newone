@@ -101,3 +101,26 @@ def test_unknown_never_overwrites_and_is_retried():
     assert h.next_batch(now=100 + 3601) == ["karma1"]  # unknown retried after an hour
     s.save(finder.Result("therapy", "instagram", "TAKEN"), now=300)
     assert [i["platform"] for i in s.available()] == ["telegram"]
+
+
+def test_blocked_platform_is_paused_and_others_continue():
+    from app.store import Store
+    store = Store(":memory:")
+    calls = []
+
+    def check(name, platform, fresh=False):
+        calls.append(platform)
+        status = "UNKNOWN" if platform == "instagram" else "AVAILABLE"
+        res = finder.Result(name, platform, status, "HTTP 429" if status == "UNKNOWN" else "")
+        if status != "UNKNOWN":
+            store.save(res)
+        return res, False
+
+    pool = [f"name{i}x" for i in range(20)]
+    h = main.Hunter(pool, check, store, ["telegram", "instagram"], batch=5, block_after=3)
+    h.run_round()
+    assert calls.count("instagram") == 3 and "instagram" in h.status()["paused"]
+    calls.clear()
+    h.run_round()  # instagram paused: telegram keeps going on NEW names
+    assert set(calls) == {"telegram"} and len(calls) == 5
+    assert len(store.available("telegram")) == 10
