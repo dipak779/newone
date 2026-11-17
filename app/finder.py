@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 AVAILABLE, TAKEN, FRAGMENT, INVALID, UNKNOWN = "AVAILABLE", "TAKEN", "FRAGMENT", "INVALID", "UNKNOWN"
+UNCONFIRMED = "UNCONFIRMED"  # public pages say free, but Telegram itself hasn't confirmed it yet
 
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "

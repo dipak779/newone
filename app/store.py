@@ -40,6 +40,12 @@ class Store:
             with self.db:
                 self.db.execute("DELETE FROM checks WHERE platform='telegram' AND status='AVAILABLE'")
                 self.db.execute("PRAGMA user_version = 1")
+        if version < 2:
+            # v2: Telegram names only count as AVAILABLE once Telegram itself confirms them.
+            with self.db:
+                self.db.execute("UPDATE checks SET status='UNCONFIRMED' WHERE platform='telegram' "
+                                "AND status='AVAILABLE' AND detail != 'confirmed by Telegram'")
+                self.db.execute("PRAGMA user_version = 2")
 
     def save(self, r: Result, now: float | None = None) -> None:
         now = now or time.time()
@@ -116,8 +122,8 @@ class Store:
     def clear_unconfirmed_telegram(self) -> int:
         """Forget Telegram AVAILABLE results that Telegram itself didn't confirm, so they're re-checked."""
         with self.lock, self.db:
-            cur = self.db.execute("DELETE FROM checks WHERE platform='telegram' AND status='AVAILABLE' "
-                                  "AND detail != 'confirmed by Telegram'")
+            cur = self.db.execute("DELETE FROM checks WHERE platform='telegram' AND "
+                                  "(status='UNCONFIRMED' OR (status='AVAILABLE' AND detail != 'confirmed by Telegram'))")
             return cur.rowcount
 
     def counts(self) -> dict[str, dict[str, int]]:

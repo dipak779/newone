@@ -62,7 +62,7 @@ class Hunter:
                 continue
             oldest = min(st[p][1] for p in platforms)
             free = any(st[p][0] == "AVAILABLE" for p in platforms)
-            unknown = any(st[p][0] == "UNKNOWN" for p in platforms)
+            unknown = any(st[p][0] in ("UNKNOWN", "UNCONFIRMED") for p in platforms)
             if (free and now - oldest > self.recheck_free) or (unknown and now - oldest > self.recheck_unknown):
                 stale_free.append((oldest, name))
             elif now - oldest > self.recheck_all:

@@ -130,7 +130,7 @@ function passes(name) {
 }
 function cell(r) {
   if (!r) return `<span class="st PENDING">checking</span>`;
-  const YN = { AVAILABLE: "✅ Yes, available", TAKEN: "❌ No, taken", FRAGMENT: "❌ No, for sale on Fragment", INVALID: "❌ No, not allowed", UNKNOWN: "⏳ Couldn't check" };
+  const YN = { AVAILABLE: "✅ Yes, available", TAKEN: "❌ No, taken", FRAGMENT: "❌ No, for sale on Fragment", INVALID: "❌ No, not allowed", UNKNOWN: "⏳ Couldn't check", UNCONFIRMED: "⚠️ Not confirmed yet" };
   return `<span class="st ${r.status}">${YN[r.status] || r.status}</span><span class="detail">${escapeHtml(r.detail)}${r.cached ? " · cached" : ""}</span>`;
 }
 function escapeHtml(s) {

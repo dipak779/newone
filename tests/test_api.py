@@ -27,6 +27,7 @@ def fake_fetch(url, headers):
 def client():
     main.MIN_INTERVAL.update(telegram=0, instagram=0)
     main.build(fake_fetch, ":memory:")
+    main.app.state.checker.confirmer = FakeConfirmer({})  # a connected Telegram that confirms by default
     return TestClient(main.app)
 
 
@@ -66,9 +67,9 @@ def test_unconfirmed_results_are_labelled_and_cleared_after_login():
     main.app.state.checker.confirmer = FakeConfirmer({}, logged_in=False)
     r = c.get("/api/scan", params={"names": "therapy", "platforms": "telegram"})
     d = [d for e, d in events(r.text) if e == "result"][0]
-    assert d["status"] == "AVAILABLE" and d["detail"].startswith("not confirmed")
+    assert d["status"] == "UNCONFIRMED"
+    assert c.get("/api/finds").json()["items"] == []  # never listed until confirmed
     assert main.app.state.store.clear_unconfirmed_telegram() == 1
-    assert c.get("/api/finds").json()["items"] == []
 
 
 def test_admin_endpoints_need_token_and_config(monkeypatch):
@@ -84,6 +85,14 @@ def test_index_and_health():
     c = client()
     assert c.get("/").status_code == 200
     assert c.get("/api/health").json()["ok"]
+
+
+def test_telegram_never_available_without_confirmation():
+    c = client()
+    main.app.state.checker.confirmer = None
+    r = c.get("/api/scan", params={"names": "therapy", "platforms": "telegram"})
+    assert [d["status"] for e, d in events(r.text) if e == "result"] == ["UNCONFIRMED"]
+    assert c.get("/api/finds").json()["items"] == []
 
 
 def test_scan_stream():

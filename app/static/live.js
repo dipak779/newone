@@ -38,11 +38,11 @@
       const LABEL = { telegram: "✈️ Telegram", instagram: "📸 Instagram" };
       const verdict = (st) => {
         if (!st) return `<span class="yn wait">⏳ Not checked yet</span>`;
-        if (st.status === "AVAILABLE" && /^not confirmed/.test(st.detail || "")) return `<span class="yn wait">⚠️ Probably free</span>`;
         if (st.status === "AVAILABLE") return `<span class="yn yes">✅ Available</span>`;
         if (st.status === "TAKEN") return `<span class="yn no">❌ Taken</span>`;
         if (st.status === "FRAGMENT") return `<span class="yn no">❌ For sale on Fragment</span>`;
         if (st.status === "INVALID") return `<span class="yn no">❌ ${/reserved/.test(st.detail || "") ? "Reserved by Telegram" : "Not allowed"}</span>`;
+        if (st.status === "UNCONFIRMED") return `<span class="yn wait">⚠️ Not confirmed yet</span>`;
         return `<span class="yn wait">⏳ Couldn't check</span>`;
       };
       const line = (g, p) => {
@@ -58,7 +58,9 @@
             ${shown.map((p) => line(g, p)).join("")}
             <span class="m">found ${ago(g.found)}</span>
           </div>`).join("")
-        : `<span class="muted small">Nothing free found yet — names appear here as soon as the hunter finds them.</span>`;
+        : (h.telegram_confirm && !h.telegram_confirm.logged_in
+            ? `<span class="muted small">Telegram names are only listed after Telegram itself confirms them. Connect Telegram at <a href="/admin" style="color:var(--accent2)">/admin</a> to start.</span>`
+            : `<span class="muted small">Nothing confirmed free yet — names appear here as soon as they're verified.</span>`);
       seen = new Set(groups.map((g) => g.username));
     } catch {
       el("#hunterInfo").textContent = "Can't reach the server.";

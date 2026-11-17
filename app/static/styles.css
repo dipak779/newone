@@ -83,6 +83,7 @@ tr.win td.name { color: var(--green); }
 .st.TAKEN { background: rgba(107,114,128,.18); color: #a1a7b8; }
 .st.FRAGMENT { background: rgba(245,158,11,.15); color: var(--amber); }
 .st.INVALID { background: rgba(239,68,68,.13); color: var(--red); }
+.st.UNCONFIRMED { background: rgba(245,158,11,.10); color: var(--amber); }
 .st.UNKNOWN { background: rgba(217,70,239,.13); color: var(--pink); }
 .st.PENDING { background: var(--card2); color: var(--muted); animation: pulse 1.2s infinite; }
 @keyframes pulse { 50% { opacity: .4; } }

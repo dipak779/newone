@@ -88,13 +88,15 @@ class Checker:
         res = finder.CHECKERS[platform](name, fetch=throttled_fetch)
         if "429" in res.detail:
             self.throttles[platform].penalize(60)
-        if platform == "telegram" and res.status == finder.AVAILABLE and self.confirmer:
-            # Public pages say free: ask Telegram itself (catches reserved/banned "invalid" names).
-            if self.confirmer.authorized():
+        if platform == "telegram" and res.status == finder.AVAILABLE:
+            # Public pages can't see names Telegram reserved or banned, so a Telegram name only
+            # counts as AVAILABLE once Telegram itself confirms it.
+            if self.confirmer and self.confirmer.authorized():
                 status, detail = self.confirmer.check(name)
                 res = finder.Result(name, platform, status, detail)
             else:
-                res = finder.Result(name, platform, res.status, "not confirmed: log in at /admin")
+                res = finder.Result(name, platform, finder.UNCONFIRMED,
+                                    "looks free; connect Telegram at /admin to confirm")
         if res.status != finder.UNKNOWN:
             self.cache[key] = (time.time(), res)
             if self.store:
