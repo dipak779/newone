@@ -38,10 +38,11 @@
       const LABEL = { telegram: "✈️ Telegram", instagram: "📸 Instagram" };
       const verdict = (st) => {
         if (!st) return `<span class="yn wait">⏳ Not checked yet</span>`;
+        if (st.status === "AVAILABLE" && /^not confirmed/.test(st.detail || "")) return `<span class="yn wait">⚠️ Probably free</span>`;
         if (st.status === "AVAILABLE") return `<span class="yn yes">✅ Available</span>`;
         if (st.status === "TAKEN") return `<span class="yn no">❌ Taken</span>`;
         if (st.status === "FRAGMENT") return `<span class="yn no">❌ For sale on Fragment</span>`;
-        if (st.status === "INVALID") return `<span class="yn no">❌ Not allowed</span>`;
+        if (st.status === "INVALID") return `<span class="yn no">❌ ${/reserved/.test(st.detail || "") ? "Reserved by Telegram" : "Not allowed"}</span>`;
         return `<span class="yn wait">⏳ Couldn't check</span>`;
       };
       const line = (g, p) => {

@@ -51,6 +51,19 @@ and give it a persistent disk mounted at `/srv/data` so found names survive rest
 
 Every push to that branch redeploys automatically.
 
+## Telegram confirmation (recommended)
+
+Public pages can't see names Telegram has reserved or banned (the app says "Sorry, this username is invalid").
+With confirmation on, every name that looks free is double-checked with Telegram itself, using your own account
+(the same check the app runs when you type a username), so only claimable names get listed.
+
+1. Go to my.telegram.org, open **API development tools**, create an app, and copy `api_id` and `api_hash`.
+2. On Render, add environment variables `TG_API_ID` and `TG_API_HASH` (and `HELPER_TOKEN` if not set yet).
+3. After the redeploy, open `https://<your-site>/admin`, enter your HELPER_TOKEN, and log in with your phone + code.
+
+The login is stored as `telegram.session` on the Render disk. Checks are spaced 10 s apart (`TG_CONFIRM_GAP`), and the
+server pauses automatically if Telegram asks it to slow down.
+
 ## Instagram home helper
 
 Instagram blocks lookups from hosting servers like Render's, so Instagram is checked from your own computer instead:
@@ -79,7 +92,9 @@ Instagram blocks lookups from hosting servers like Render's, so Instagram is che
 | `HUNT_BATCH` | 5 | names per round |
 | `HUNT_VARIANTS` | 1 | also hunt prefixed/suffixed variants |
 | `HUNT_PLATFORMS` | telegram,instagram | platforms the hunter checks |
-| `HELPER_TOKEN` | (unset) | enables the Instagram home helper |
+| `HELPER_TOKEN` | (unset) | admin password: enables /admin and the Instagram home helper |
+| `TG_API_ID`, `TG_API_HASH` | (unset) | enable Telegram confirmation (from my.telegram.org) |
+| `TG_CONFIRM_GAP` | 10 | seconds between Telegram confirmation checks |
 | `DB_PATH` | data/handlehunt.db | SQLite file |
 
 ## Result meanings

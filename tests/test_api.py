@@ -38,6 +38,48 @@ def events(text):
     return out
 
 
+class FakeConfirmer:
+    def __init__(self, answers, logged_in=True):
+        self.answers, self.logged_in, self.asked = answers, logged_in, []
+
+    def authorized(self, max_age=300):
+        return self.logged_in
+
+    def check(self, name):
+        self.asked.append(name)
+        return self.answers.get(name, ("AVAILABLE", "confirmed by Telegram"))
+
+
+def test_telegram_confirmation_filters_reserved_names():
+    c = client()
+    conf = FakeConfirmer({"getelite": ("INVALID", "Telegram says invalid (reserved or banned)")})
+    main.app.state.checker.confirmer = conf
+    r = c.get("/api/scan", params={"names": "getelite,therapy,money", "platforms": "telegram"})
+    got = {d["username"]: d["status"] for e, d in events(r.text) if e == "result"}
+    assert got == {"getelite": "INVALID", "therapy": "AVAILABLE", "money": "TAKEN"}
+    assert conf.asked == ["getelite", "therapy"]  # taken-by-page names never hit the Telegram API
+    assert [i["username"] for i in c.get("/api/finds").json()["items"]] == ["therapy"]
+
+
+def test_unconfirmed_results_are_labelled_and_cleared_after_login():
+    c = client()
+    main.app.state.checker.confirmer = FakeConfirmer({}, logged_in=False)
+    r = c.get("/api/scan", params={"names": "therapy", "platforms": "telegram"})
+    d = [d for e, d in events(r.text) if e == "result"][0]
+    assert d["status"] == "AVAILABLE" and d["detail"].startswith("not confirmed")
+    assert main.app.state.store.clear_unconfirmed_telegram() == 1
+    assert c.get("/api/finds").json()["items"] == []
+
+
+def test_admin_endpoints_need_token_and_config(monkeypatch):
+    c = client()
+    monkeypatch.setattr(main, "HELPER_TOKEN", "s3cret")
+    assert c.get("/api/admin/telegram").status_code == 401
+    r = c.get("/api/admin/telegram", headers={"X-Helper-Token": "s3cret"})
+    assert r.status_code == 404 and "TG_API_ID" in r.json()["detail"]
+    assert c.get("/admin").status_code == 200
+
+
 def test_index_and_health():
     c = client()
     assert c.get("/").status_code == 200
@@ -164,3 +206,30 @@ def test_migration_clears_old_telegram_available(tmp_path):
     s2.save(finder.Result("newone", "telegram", "AVAILABLE"))
     s2.db.close()
     assert len(Store(db).available()) == 1  # migration runs only once
+
+
+def test_confirmer_maps_telegram_errors(tmp_path):
+    from telethon import errors
+    from app.tg_confirm import TelegramConfirmer
+    c = TelegramConfirmer(1, "x", tmp_path / "s.session", min_gap=0)
+
+    def answer(value):
+        def run(coro, timeout=60):
+            coro.close()
+            if isinstance(value, Exception):
+                raise value
+            return value
+        return run
+    cases = [
+        (True, "AVAILABLE"), (False, "TAKEN"),
+        (errors.UsernameInvalidError(request=None), "INVALID"),
+        (errors.UsernameOccupiedError(request=None), "TAKEN"),
+        (errors.UsernamePurchaseAvailableError(request=None), "FRAGMENT"),
+    ]
+    for value, expected in cases:
+        c._run = answer(value)
+        assert c.check("getelite")[0] == expected
+    flood = errors.FloodWaitError(request=None, capture=120)
+    c._run = answer(flood)
+    assert c.check("getelite")[0] == "UNKNOWN"
+    assert "wait" in c.check("other")[1]  # paused: doesn't call Telegram again

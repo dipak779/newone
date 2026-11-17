@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>HandleHunt Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .card { max-width: 520px; }
+    form { display: grid; gap: 10px; margin-top: 14px; }
+    .ok { color: var(--green); } .bad { color: var(--red); }
+    ol { color: var(--muted); padding-left: 20px; margin: 8px 0 0; } ol li { margin: 4px 0; }
+    #status { font-size: 15px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <header class="nav"><a class="brand" href="/"><span class="logo">@</span>HandleHunt</a><nav><a href="/">← Back to site</a></nav></header>
+
+  <section class="card">
+    <h2>Telegram confirmation</h2>
+    <p class="muted small">Logs the server into <b>your</b> Telegram account so it can ask Telegram directly whether a
+      username can be claimed, the same check the app does when you type a username. Only names Telegram confirms are listed.</p>
+
+    <form id="tokenForm">
+      <label class="label" for="token">Admin token (your HELPER_TOKEN from Render)</label>
+      <input id="token" type="password" autocomplete="current-password" required>
+      <button class="btn primary">Unlock</button>
+    </form>
+    <p id="status"></p>
+  </section>
+
+  <section class="card hidden" id="loginCard">
+    <h2>Log in to Telegram</h2>
+    <form id="phoneForm">
+      <label class="label" for="phone">Your phone number with country code</label>
+      <input id="phone" type="tel" placeholder="+977 98XXXXXXXX" required>
+      <button class="btn primary">Send login code</button>
+    </form>
+    <form id="codeForm" class="hidden">
+      <label class="label" for="code">Code Telegram just sent you (check the Telegram app)</label>
+      <input id="code" inputmode="numeric" autocomplete="one-time-code" required>
+      <button class="btn primary">Log in</button>
+    </form>
+    <form id="pwForm" class="hidden">
+      <label class="label" for="pw">Your Telegram 2-step verification password</label>
+      <input id="pw" type="password" required>
+      <button class="btn primary">Finish login</button>
+    </form>
+    <p id="loginMsg" class="small"></p>
+  </section>
+
+  <section class="card hidden" id="doneCard">
+    <h2 class="ok">✅ Connected to Telegram</h2>
+    <p class="muted small" id="doneInfo"></p>
+    <button id="logoutBtn" class="btn ghost sm">Disconnect Telegram</button>
+  </section>
+
+  <section class="card hidden" id="setupCard">
+    <h2>Setup needed</h2>
+    <ol>
+      <li>Open <b>my.telegram.org</b>, log in with your phone and open <b>API development tools</b>.</li>
+      <li>Create an app (any name, e.g. HandleHunt, platform "Other"). Copy <b>api_id</b> and <b>api_hash</b>.</li>
+      <li>In Render, open <b>Environment</b> and add <code>TG_API_ID</code> and <code>TG_API_HASH</code>, then save.</li>
+      <li>Come back here after the redeploy.</li>
+    </ol>
+  </section>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    let token = "";
+    try { token = localStorage.getItem("hh.admin") || ""; } catch {}
+    $("#token").value = token;
+
+    async function api(path, body) {
+      const res = await fetch(path, {
+        method: body ? "POST" : "GET",
+        headers: { "X-Helper-Token": token, ...(body ? { "Content-Type": "application/json" } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let data = {};
+      try { data = await res.json(); } catch {}
+      if (!res.ok) throw Object.assign(new Error(data.detail || `HTTP ${res.status}`), { code: res.status });
+      return data;
+    }
+    const show = (id, on) => $(id).classList.toggle("hidden", !on);
+    const msg = (t, bad) => { $("#loginMsg").textContent = t; $("#loginMsg").className = "small " + (bad ? "bad" : "muted"); };
+
+    async function refresh() {
+      ["#loginCard", "#doneCard", "#setupCard"].forEach((id) => show(id, false));
+      try {
+        const s = await api("/api/admin/telegram");
+        $("#status").innerHTML = s.authorized ? `<span class="ok">Unlocked.</span>` : `<span class="ok">Unlocked.</span> Telegram not connected yet.`;
+        if (s.authorized) {
+          show("#doneCard", true);
+          $("#doneInfo").textContent = `${s.checks} names confirmed with Telegram since the last restart.` +
+            (s.rate_limited_seconds ? ` Telegram asked us to pause for ${Math.ceil(s.rate_limited_seconds / 60)} min.` : "");
+        } else show("#loginCard", true);
+      } catch (e) {
+        if (e.code === 401) $("#status").innerHTML = `<span class="bad">Wrong admin token.</span>`;
+        else if (e.code === 404 && /TG_API/.test(e.message)) { $("#status").textContent = ""; show("#setupCard", true); }
+        else $("#status").innerHTML = `<span class="bad">${e.message}</span>`;
+      }
+    }
+
+    $("#tokenForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      token = $("#token").value.trim();
+      try { localStorage.setItem("hh.admin", token); } catch {}
+      refresh();
+    });
+    $("#phoneForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); msg("Sending…");
+      try {
+        await api("/api/admin/telegram/code", { phone: $("#phone").value });
+        show("#phoneForm", false); show("#codeForm", true);
+        msg("Code sent. It arrives as a message from “Telegram” inside the Telegram app.");
+      } catch (err) { msg(err.message, true); }
+    });
+    $("#codeForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); msg("Logging in…");
+      try {
+        const r = await api("/api/admin/telegram/login", { code: $("#code").value });
+        if (r.status === "password_needed") { show("#codeForm", false); show("#pwForm", true); msg("Your account has 2-step verification."); }
+        else { msg(""); refresh(); }
+      } catch (err) { msg(err.message, true); }
+    });
+    $("#pwForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); msg("Logging in…");
+      try { await api("/api/admin/telegram/login", { password: $("#pw").value }); $("#pw").value = ""; msg(""); refresh(); }
+      catch (err) { msg(err.message, true); }
+    });
+    $("#logoutBtn").addEventListener("click", async () => {
+      if (!confirm("Disconnect Telegram? Names will stop being confirmed.")) return;
+      await api("/api/admin/telegram/logout", {}); refresh();
+    });
+    if (token) refresh();
+  </script>
+</body>
+</html>

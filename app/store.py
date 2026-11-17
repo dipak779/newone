@@ -113,6 +113,13 @@ class Store:
                 st.setdefault(r[0], {})[r[1]] = {"status": r[2], "detail": r[3], "checked_at": r[4]}
         return [{"username": r["username"], "found": r["found"], "platforms": st.get(r["username"], {})} for r in rows]
 
+    def clear_unconfirmed_telegram(self) -> int:
+        """Forget Telegram AVAILABLE results that Telegram itself didn't confirm, so they're re-checked."""
+        with self.lock, self.db:
+            cur = self.db.execute("DELETE FROM checks WHERE platform='telegram' AND status='AVAILABLE' "
+                                  "AND detail != 'confirmed by Telegram'")
+            return cur.rowcount
+
     def counts(self) -> dict[str, dict[str, int]]:
         out: dict[str, dict[str, int]] = {}
         with self.lock:

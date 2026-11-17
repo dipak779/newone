@@ -39,6 +39,9 @@ HUNT_ENABLED = os.getenv("HUNT_ENABLED", "1") == "1"
 HUNT_INTERVAL = float(os.getenv("HUNT_INTERVAL_SECONDS", "60"))
 HUNT_BATCH = int(os.getenv("HUNT_BATCH", "5"))
 HUNT_VARIANTS = os.getenv("HUNT_VARIANTS", "1") == "1"  # also hunt getX / Xhq style names
+TG_API_ID = os.getenv("TG_API_ID", "")
+TG_API_HASH = os.getenv("TG_API_HASH", "")
+TG_CONFIRM_GAP = float(os.getenv("TG_CONFIRM_GAP", "10"))
 HELPER_TOKEN = os.getenv("HELPER_TOKEN", "")  # enables the home helper endpoints when set
 HELPER_PLATFORMS = ("instagram",)
 HUNT_PLATFORMS = [p for p in os.getenv("HUNT_PLATFORMS", "telegram,instagram").split(",") if p in finder.CHECKERS]
@@ -66,8 +69,9 @@ class Throttle:
 class Checker:
     """Shared checker: cache + per-platform throttling. `fetch` is swappable for tests."""
 
-    def __init__(self, fetch: finder.Fetcher = finder.http_get, store: Store | None = None):
-        self.fetch, self.store = fetch, store
+    def __init__(self, fetch: finder.Fetcher = finder.http_get, store: Store | None = None,
+                 confirmer=None):
+        self.fetch, self.store, self.confirmer = fetch, store, confirmer
         self.cache: dict[tuple[str, str], tuple[float, finder.Result]] = {}
         self.throttles = {p: Throttle(MIN_INTERVAL[p]) for p in finder.CHECKERS}
 
@@ -84,6 +88,13 @@ class Checker:
         res = finder.CHECKERS[platform](name, fetch=throttled_fetch)
         if "429" in res.detail:
             self.throttles[platform].penalize(60)
+        if platform == "telegram" and res.status == finder.AVAILABLE and self.confirmer:
+            # Public pages say free: ask Telegram itself (catches reserved/banned "invalid" names).
+            if self.confirmer.authorized():
+                status, detail = self.confirmer.check(name)
+                res = finder.Result(name, platform, status, detail)
+            else:
+                res = finder.Result(name, platform, res.status, "not confirmed: log in at /admin")
         if res.status != finder.UNKNOWN:
             self.cache[key] = (time.time(), res)
             if self.store:
@@ -119,11 +130,20 @@ def hunt_pool() -> list[str]:
     return pool
 
 
+def make_confirmer(db_path: str):
+    if not (TG_API_ID and TG_API_HASH) or db_path == ":memory:":
+        return None
+    from .tg_confirm import TelegramConfirmer
+    return TelegramConfirmer(int(TG_API_ID), TG_API_HASH, Path(db_path).with_name("telegram.session"),
+                             min_gap=TG_CONFIRM_GAP)
+
+
 def build(fetch: finder.Fetcher = finder.http_get, db_path: str = DB_PATH) -> None:
     """(Re)create the shared services. Tests call this with a fake fetcher and :memory:."""
     store = Store(db_path)
     app.state.store = store
-    app.state.checker = Checker(fetch, store)
+    app.state.confirmer = make_confirmer(db_path)
+    app.state.checker = Checker(fetch, store, app.state.confirmer)
     app.state.limiter = RateLimiter(CHECKS_PER_HOUR_PER_IP)
     app.state.hunter = Hunter(hunt_pool(), app.state.checker.check, store, HUNT_PLATFORMS,
                               interval=HUNT_INTERVAL, batch=HUNT_BATCH)
@@ -242,10 +262,72 @@ def helper_results(results: list[dict] = Body(...), x_helper_token: str | None =
     return {"saved": saved}
 
 
+# ---------- admin: log the server into Telegram (protected by HELPER_TOKEN)
+
+def confirmer_or_404():
+    c = app.state.confirmer
+    if not c:
+        raise HTTPException(404, "Telegram confirmation is off: set TG_API_ID and TG_API_HASH on the server.")
+    return c
+
+
+@app.get("/api/admin/telegram")
+def admin_tg_status(x_helper_token: str | None = Header(None)):
+    require_helper(x_helper_token)
+    return confirmer_or_404().status()
+
+
+@app.post("/api/admin/telegram/code")
+def admin_tg_code(body: dict = Body(...), x_helper_token: str | None = Header(None)):
+    require_helper(x_helper_token)
+    phone = str(body.get("phone", "")).replace(" ", "")
+    if not phone.startswith("+") or not phone[1:].isdigit():
+        raise HTTPException(400, "Enter the phone number with country code, e.g. +9779800000000.")
+    try:
+        confirmer_or_404().send_code(phone)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"Telegram refused: {type(e).__name__}")
+    return {"sent": True}
+
+
+@app.post("/api/admin/telegram/login")
+def admin_tg_login(body: dict = Body(...), x_helper_token: str | None = Header(None)):
+    require_helper(x_helper_token)
+    c = confirmer_or_404()
+    try:
+        result = c.sign_in(code=str(body.get("code") or "").strip() or None,
+                           password=body.get("password") or None)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"Login failed: {type(e).__name__}")
+    if result == "ok":
+        cleared = app.state.store.clear_unconfirmed_telegram()
+        app.state.checker.cache.clear()
+        return {"status": "ok", "rechecking": cleared}
+    return {"status": result}
+
+
+@app.post("/api/admin/telegram/logout")
+def admin_tg_logout(x_helper_token: str | None = Header(None)):
+    require_helper(x_helper_token)
+    confirmer_or_404().logout()
+    return {"status": "logged_out"}
+
+
+@app.get("/admin")
+def admin_page():
+    return FileResponse(STATIC / "admin.html")
+
+
 @app.get("/api/hunter")
 def hunter_status():
     seen = getattr(app.state, "helper_seen_at", None)
+    conf = app.state.confirmer
     return {**app.state.hunter.status(), "counts": app.state.store.counts(), "enabled": HUNT_ENABLED,
+            "telegram_confirm": {"enabled": bool(conf), "logged_in": bool(conf and conf.authorized())},
             "helper": {"enabled": bool(HELPER_TOKEN), "last_seen_at": seen}}
 
 
