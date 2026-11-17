@@ -40,7 +40,7 @@
         if (!st) return `<span class="yn wait">⏳ Not checked yet</span>`;
         if (st.status === "AVAILABLE") return `<span class="yn yes">✅ Available</span>`;
         if (st.status === "TAKEN") return `<span class="yn no">❌ Taken</span>`;
-        if (st.status === "FRAGMENT") return `<span class="yn no">❌ Sold on Fragment</span>`;
+        if (st.status === "FRAGMENT") return `<span class="yn no">❌ For sale on Fragment</span>`;
         if (st.status === "INVALID") return `<span class="yn no">❌ Not allowed</span>`;
         return `<span class="yn wait">⏳ Couldn't check</span>`;
       };

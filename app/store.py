@@ -31,6 +31,15 @@ class Store:
         self.lock = threading.Lock()
         with self.lock:
             self.db.executescript(SCHEMA)
+            self._migrate()
+
+    def _migrate(self) -> None:
+        version = self.db.execute("PRAGMA user_version").fetchone()[0]
+        if version < 1:
+            # v1: Fragment "Available" (= for sale) was wrongly counted as free; re-check those names.
+            with self.db:
+                self.db.execute("DELETE FROM checks WHERE platform='telegram' AND status='AVAILABLE'")
+                self.db.execute("PRAGMA user_version = 1")
 
     def save(self, r: Result, now: float | None = None) -> None:
         now = now or time.time()

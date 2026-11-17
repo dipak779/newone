@@ -149,3 +149,18 @@ def test_finds_and_helper(monkeypatch):
     assert r.json()["saved"] == 1
     items = c.get("/api/finds").json()["items"]
     assert items[0]["platforms"]["instagram"]["status"] == "TAKEN"
+
+
+def test_migration_clears_old_telegram_available(tmp_path):
+    from app.store import Store
+    db = tmp_path / "old.db"
+    s = Store(db)
+    s.db.execute("PRAGMA user_version = 0")
+    s.save(finder.Result("wiselab", "telegram", "AVAILABLE"))
+    s.save(finder.Result("money", "telegram", "TAKEN"))
+    s.db.close()
+    s2 = Store(db)
+    assert s2.available() == [] and s2.counts()["telegram"] == {"TAKEN": 1}
+    s2.save(finder.Result("newone", "telegram", "AVAILABLE"))
+    s2.db.close()
+    assert len(Store(db).available()) == 1  # migration runs only once

@@ -87,21 +87,28 @@ def check_telegram(username: str, fetch: Fetcher = http_get, use_fragment: bool 
         return Result(username, "telegram", TAKEN, kind)
 
     if use_fragment:
-        frag = fragment_status(username, fetch)
-        if frag and frag.lower() not in ("available", "unavailable"):
-            return Result(username, "telegram", FRAGMENT, frag)
-        if frag:
-            return Result(username, "telegram", AVAILABLE, f"no t.me page; fragment: {frag}")
-    return Result(username, "telegram", AVAILABLE, "no t.me page")
+        listed, frag = fragment_status(username, fetch)
+        if listed is None:
+            return Result(username, "telegram", UNKNOWN, f"fragment.com unreachable ({frag})")
+        if listed:
+            # Any name with its own Fragment page belongs to Fragment's marketplace. Note that
+            # Fragment's "Available" means "available to BUY", not free to claim.
+            label = {"available": "for sale on Fragment", "unavailable": "reserved on Fragment"}.get(
+                (frag or "").lower(), f"Fragment: {frag or 'listed'}")
+            return Result(username, "telegram", FRAGMENT, label)
+    return Result(username, "telegram", AVAILABLE, "no t.me page, not on Fragment")
 
 
-def fragment_status(username: str, fetch: Fetcher = http_get) -> str | None:
-    """Return the fragment.com status text (e.g. 'Sold', 'On auction', 'Taken'), or None."""
+def fragment_status(username: str, fetch: Fetcher = http_get) -> tuple[bool | None, str]:
+    """(listed, status_text). listed=None means Fragment couldn't be checked (treat as unknown).
+    Names Fragment doesn't know about redirect to its search page (?query=...)."""
     r = fetch(f"https://fragment.com/username/{username}", {})
-    if r.status != 200 or "?query=" in r.url:
-        return None  # not listed on Fragment
+    if r.status != 200:
+        return None, f"HTTP {r.status}"
+    if "?query=" in r.url:
+        return False, ""
     m = re.search(r'tm-section-header-status[^"]*"[^>]*>\s*([^<]+?)\s*<', r.body)
-    return m.group(1) if m else None
+    return True, (m.group(1) if m else "")
 
 
 # --------------------------------------------------------------------------- Instagram

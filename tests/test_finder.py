@@ -40,6 +40,24 @@ def test_telegram_available_not_on_fragment():
     assert uf.check_telegram("zqxkv", f).status == uf.AVAILABLE
 
 
+def test_fragment_available_means_for_sale_not_free():
+    page = '<span class="tm-section-header-status tm-status-avail">Available</span>'
+    f = fake({
+        "https://t.me/": R(200, "<html></html>", "https://t.me/wiselab"),
+        "https://fragment.com/": R(200, page, "https://fragment.com/username/wiselab"),
+    })
+    res = uf.check_telegram("wiselab", f)
+    assert (res.status, res.detail) == (uf.FRAGMENT, "for sale on Fragment")
+
+
+def test_fragment_unreachable_is_unknown_not_free():
+    f = fake({
+        "https://t.me/": R(200, "<html></html>", "https://t.me/zqxkv"),
+        "https://fragment.com/": R(403, "", "https://fragment.com/username/zqxkv"),
+    })
+    assert uf.check_telegram("zqxkv", f).status == uf.UNKNOWN
+
+
 def test_telegram_on_fragment():
     page = '<span class="tm-section-header-status tm-status-unavail">Sold</span>'
     f = fake({
@@ -47,7 +65,7 @@ def test_telegram_on_fragment():
         "https://fragment.com/": R(200, page, "https://fragment.com/username/karma"),
     })
     res = uf.check_telegram("karma", f)
-    assert (res.status, res.detail) == (uf.FRAGMENT, "Sold")
+    assert (res.status, res.detail) == (uf.FRAGMENT, "Fragment: Sold")
 
 
 def test_instagram():
