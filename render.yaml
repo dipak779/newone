@@ -1,0 +1,24 @@
+# Render Blueprint: Dashboard -> New -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: handlehunt
+    runtime: docker
+    plan: starter            # must be a paid, always-on plan: free instances sleep and stop the hunter
+    numInstances: 1          # the hunter, cache and limits live in one process
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:                    # keeps found names across deploys/restarts
+      name: handlehunt-data
+      mountPath: /srv/data
+      sizeGB: 1
+    envVars:
+      - key: DB_PATH
+        value: /srv/data/handlehunt.db
+      - key: HUNT_ENABLED
+        value: "1"
+      - key: HUNT_INTERVAL_SECONDS
+        value: "60"
+      - key: HUNT_BATCH
+        value: "5"
+      - key: HUNT_PLATFORMS
+        value: telegram,instagram

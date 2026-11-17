@@ -42,6 +42,15 @@ It deploys to any host that runs a container or Python app (Render, Railway, Fly
 Use **one** always-on server instance (no "sleep when idle" free tier, or the hunter stops),
 and give it a persistent disk mounted at `/srv/data` so found names survive restarts.
 
+## Deploy on Render
+
+1. Create an account at render.com and connect your GitHub (allow access to this repo).
+2. Dashboard -> **New** -> **Blueprint** -> pick this repo and the branch with the code.
+3. Render reads `render.yaml` and creates the `handlehunt` web service (Starter plan + 1 GB disk). Click **Apply**.
+4. After the build, open the `https://handlehunt-xxxx.onrender.com` URL. The Live finds feed fills in within minutes.
+
+Every push to that branch redeploys automatically.
+
 ## Settings (environment variables)
 
 | Variable | Default | Meaning |
