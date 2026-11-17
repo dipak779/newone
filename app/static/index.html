@@ -13,6 +13,7 @@
   <header class="nav">
     <a class="brand" href="/"><span class="logo">@</span>HandleHunt</a>
     <nav>
+      <a href="#live">Live finds</a>
       <a href="#finder">Finder</a>
       <a href="#saved">Saved <span id="savedCount" class="pill">0</span></a>
       <a href="#how">How it works</a>
@@ -23,6 +24,19 @@
     <h1>Grab the <span class="grad">@word</span> before anyone else.</h1>
     <p>Scan short, one-word usernames like <code>@karma</code>, <code>@therapy</code> or <code>@showoff</code>
       across Telegram and Instagram in seconds.</p>
+  </section>
+
+  <section id="live" class="card">
+    <div class="row between">
+      <h2><span id="liveDot" class="dot"></span> Live finds <span id="liveCount" class="muted small"></span></h2>
+      <div class="seg" id="liveFilter">
+        <button data-p="" class="active">All</button>
+        <button data-p="telegram">Telegram</button>
+        <button data-p="instagram">Instagram</button>
+      </div>
+    </div>
+    <p id="hunterInfo" class="muted small"></p>
+    <div id="liveList" class="livegrid"></div>
   </section>
 
   <main id="finder" class="card finder">
@@ -116,5 +130,6 @@
 
   <footer class="muted small">HandleHunt · results are best-effort signals, not guarantees.</footer>
   <script src="/static/app.js"></script>
+  <script src="/static/live.js"></script>
 </body>
 </html>

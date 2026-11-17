@@ -7,6 +7,22 @@ on **Telegram** and **Instagram**.
 - Live results stream in per name and platform
 - Filter by *any free* / *free on both*, copy hits, export CSV
 - Star names to keep them in a saved list and re-scan them later
+- **Live finds:** a background hunter checks a new batch of names every minute, around the clock,
+  and lists every name that's available on Telegram and/or Instagram (refreshes on the page every 20s)
+
+## The background hunter
+
+When the server starts, it begins working through ~3,000 candidates (the words in `app/words.txt` plus
+variants like `getkarma`, `karmahq`). Every minute it checks the next 5 names on both platforms and saves
+the results in SQLite (`data/handlehunt.db`). Order of work:
+
+1. names never checked
+2. names that were available (re-checked every 6 h so the list stays honest) or blocked (`UNKNOWN`, retried hourly)
+3. everything else, re-checked weekly
+
+Names that get taken drop off the Live finds list automatically. Add words to `app/words.txt` to grow the pool.
+
+API: `GET /api/available?platform=telegram|instagram` and `GET /api/hunter` (status).
 
 ## Run locally
 
@@ -23,7 +39,8 @@ docker build -t handlehunt . && docker run -p 8000:8000 handlehunt
 ```
 
 It deploys to any host that runs a container or Python app (Render, Railway, Fly.io, a VPS).
-Use one server instance: the cache, throttle and rate limits live in memory.
+Use **one** always-on server instance (no "sleep when idle" free tier, or the hunter stops),
+and give it a persistent disk mounted at `/srv/data` so found names survive restarts.
 
 ## Settings (environment variables)
 
@@ -34,6 +51,12 @@ Use one server instance: the cache, throttle and rate limits live in memory.
 | `CACHE_TTL_SECONDS` | 900 | how long results are reused |
 | `TELEGRAM_INTERVAL` | 0.7 | seconds between requests to Telegram (whole server) |
 | `INSTAGRAM_INTERVAL` | 3.0 | seconds between requests to Instagram (whole server) |
+| `HUNT_ENABLED` | 1 | run the background hunter |
+| `HUNT_INTERVAL_SECONDS` | 60 | time between hunter rounds |
+| `HUNT_BATCH` | 5 | names per round |
+| `HUNT_VARIANTS` | 1 | also hunt prefixed/suffixed variants |
+| `HUNT_PLATFORMS` | telegram,instagram | platforms the hunter checks |
+| `DB_PATH` | data/handlehunt.db | SQLite file |
 
 ## Result meanings
 

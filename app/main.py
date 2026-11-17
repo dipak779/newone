@@ -9,6 +9,7 @@ import os
 import threading
 import time
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
 
@@ -17,6 +18,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import finder
+from .hunter import Hunter
+from .store import Store
 
 STATIC = Path(__file__).with_name("static")
 
@@ -29,6 +32,13 @@ MIN_INTERVAL = {
     "telegram": float(os.getenv("TELEGRAM_INTERVAL", "0.7")),
     "instagram": float(os.getenv("INSTAGRAM_INTERVAL", "3.0")),
 }
+
+DB_PATH = os.getenv("DB_PATH", str(Path(__file__).resolve().parent.parent / "data" / "handlehunt.db"))
+HUNT_ENABLED = os.getenv("HUNT_ENABLED", "1") == "1"
+HUNT_INTERVAL = float(os.getenv("HUNT_INTERVAL_SECONDS", "60"))
+HUNT_BATCH = int(os.getenv("HUNT_BATCH", "5"))
+HUNT_VARIANTS = os.getenv("HUNT_VARIANTS", "1") == "1"  # also hunt getX / Xhq style names
+HUNT_PLATFORMS = [p for p in os.getenv("HUNT_PLATFORMS", "telegram,instagram").split(",") if p in finder.CHECKERS]
 
 PREFIXES = ["get", "the", "its", "im", "real", "hey", "mr"]
 SUFFIXES = ["hq", "app", "io", "x", "club", "lab", "pro"]
@@ -53,15 +63,15 @@ class Throttle:
 class Checker:
     """Shared checker: cache + per-platform throttling. `fetch` is swappable for tests."""
 
-    def __init__(self, fetch: finder.Fetcher = finder.http_get):
-        self.fetch = fetch
+    def __init__(self, fetch: finder.Fetcher = finder.http_get, store: Store | None = None):
+        self.fetch, self.store = fetch, store
         self.cache: dict[tuple[str, str], tuple[float, finder.Result]] = {}
         self.throttles = {p: Throttle(MIN_INTERVAL[p]) for p in finder.CHECKERS}
 
-    def check(self, name: str, platform: str) -> tuple[finder.Result, bool]:
+    def check(self, name: str, platform: str, fresh: bool = False) -> tuple[finder.Result, bool]:
         key = (name, platform)
         hit = self.cache.get(key)
-        if hit and time.time() - hit[0] < CACHE_TTL:
+        if hit and not fresh and time.time() - hit[0] < CACHE_TTL:
             return hit[1], True
 
         def throttled_fetch(url: str, headers: dict) -> finder.Response:
@@ -73,6 +83,8 @@ class Checker:
             self.throttles[platform].penalize(60)
         if res.status != finder.UNKNOWN:
             self.cache[key] = (time.time(), res)
+            if self.store:
+                self.store.save(res)
         return res, False
 
 
@@ -94,10 +106,36 @@ class RateLimiter:
             self.hits[ip].extend([time.time()] * n)
 
 
-app = FastAPI(title="HandleHunt", docs_url="/api/docs")
-app.state.checker = Checker()
-app.state.limiter = RateLimiter(CHECKS_PER_HOUR_PER_IP)
 WORDS = finder.load_words(finder.DEFAULT_WORDS)
+
+
+def hunt_pool() -> list[str]:
+    pool = list(WORDS)
+    if HUNT_VARIANTS:
+        pool += [p + w for w in WORDS for p in PREFIXES] + [w + s for w in WORDS for s in SUFFIXES]
+    return pool
+
+
+def build(fetch: finder.Fetcher = finder.http_get, db_path: str = DB_PATH) -> None:
+    """(Re)create the shared services. Tests call this with a fake fetcher and :memory:."""
+    store = Store(db_path)
+    app.state.store = store
+    app.state.checker = Checker(fetch, store)
+    app.state.limiter = RateLimiter(CHECKS_PER_HOUR_PER_IP)
+    app.state.hunter = Hunter(hunt_pool(), app.state.checker.check, store, HUNT_PLATFORMS,
+                              interval=HUNT_INTERVAL, batch=HUNT_BATCH)
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    if HUNT_ENABLED:
+        _app.state.hunter.start()
+    yield
+    _app.state.hunter.stop()
+
+
+app = FastAPI(title="HandleHunt", docs_url="/api/docs", lifespan=lifespan)
+build()
 
 
 def clean_names(raw: str) -> list[str]:
@@ -142,6 +180,18 @@ def limits(request: Request):
         "per_hour": CHECKS_PER_HOUR_PER_IP,
         "max_names": MAX_NAMES_PER_SCAN,
     }
+
+
+@app.get("/api/available")
+def available(platform: str | None = Query(None, pattern="^(telegram|instagram)$"),
+              limit: int = Query(200, ge=1, le=1000)):
+    """Names the hunter (or anyone's scan) found AVAILABLE, newest first."""
+    return {"items": app.state.store.available(platform, limit)}
+
+
+@app.get("/api/hunter")
+def hunter_status():
+    return {**app.state.hunter.status(), "counts": app.state.store.counts(), "enabled": HUNT_ENABLED}
 
 
 @app.get("/api/scan")
