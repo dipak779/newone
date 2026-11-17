@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HandleHunt — find rare usernames</title>
+  <meta name="description" content="Find available short word usernames on Telegram and Instagram.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="/"><span class="logo">@</span>HandleHunt</a>
+    <nav>
+      <a href="#finder">Finder</a>
+      <a href="#saved">Saved <span id="savedCount" class="pill">0</span></a>
+      <a href="#how">How it works</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Grab the <span class="grad">@word</span> before anyone else.</h1>
+    <p>Scan short, one-word usernames like <code>@karma</code>, <code>@therapy</code> or <code>@showoff</code>
+      across Telegram and Instagram in seconds.</p>
+  </section>
+
+  <main id="finder" class="card finder">
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="manual" role="tab">My words</button>
+      <button class="tab" data-tab="random" role="tab">Random generator</button>
+    </div>
+
+    <div class="tabpane" data-pane="manual">
+      <label for="names" class="label">Usernames (comma, space or new line separated)</label>
+      <textarea id="names" rows="4" placeholder="showoff, manner, therapy, money, cash, save, pleased, karma"></textarea>
+    </div>
+
+    <div class="tabpane hidden" data-pane="random">
+      <div class="grid4">
+        <label>How many<input id="rCount" type="number" min="1" max="50" value="20"></label>
+        <label>Min letters<input id="rMin" type="number" min="1" max="30" value="5"></label>
+        <label>Max letters<input id="rMax" type="number" min="1" max="30" value="7"></label>
+        <label>Style
+          <select id="rStyle">
+            <option value="plain">Plain word (karma)</option>
+            <option value="prefix">Prefix (getkarma)</option>
+            <option value="suffix">Suffix (karmahq)</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </label>
+      </div>
+      <button id="genBtn" class="btn ghost">🎲 Generate names</button>
+    </div>
+
+    <div class="row between">
+      <div class="platforms">
+        <label class="toggle"><input type="checkbox" value="telegram" checked><span>✈️ Telegram</span></label>
+        <label class="toggle"><input type="checkbox" value="instagram" checked><span>📸 Instagram</span></label>
+      </div>
+      <div class="row">
+        <span id="quota" class="muted small"></span>
+        <button id="scanBtn" class="btn primary">Scan usernames</button>
+      </div>
+    </div>
+
+    <div id="progressWrap" class="progress hidden"><div id="progress"></div></div>
+    <p id="error" class="error hidden"></p>
+  </main>
+
+  <section id="resultsCard" class="card hidden">
+    <div class="row between">
+      <h2>Results <span id="summary" class="muted small"></span></h2>
+      <div class="row">
+        <div class="seg" id="filter">
+          <button data-f="all" class="active">All</button>
+          <button data-f="any">Any free</button>
+          <button data-f="both">Free on both</button>
+        </div>
+        <button id="copyBtn" class="btn ghost sm">Copy free</button>
+        <button id="csvBtn" class="btn ghost sm">Export CSV</button>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Username</th><th class="col-telegram">Telegram</th><th class="col-instagram">Instagram</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="saved" class="card">
+    <div class="row between">
+      <h2>Saved names</h2>
+      <button id="rescanSaved" class="btn ghost sm">Re-scan saved</button>
+    </div>
+    <p class="muted small">Star a result to keep it here (stored in this browser).</p>
+    <div id="savedList" class="chips"></div>
+  </section>
+
+  <section id="how" class="card how">
+    <h2>How it works</h2>
+    <div class="grid3">
+      <div><h3>✈️ Telegram</h3><p>We check the public <code>t.me</code> page, then fragment.com for names sold or on auction. Telegram needs <b>5+ characters</b>; shorter names are only sold on Fragment.</p></div>
+      <div><h3>📸 Instagram</h3><p>We query Instagram's public profile lookup. "Not found" usually means free, but names can be reserved or belong to banned accounts.</p></div>
+      <div><h3>⚖️ Fair use</h3><p>Requests are throttled and cached server-side to stay polite to both platforms. Always confirm by claiming the name in the app.</p></div>
+    </div>
+    <div class="legend">
+      <span class="st AVAILABLE">Available</span> nobody has it
+      <span class="st TAKEN">Taken</span> in use
+      <span class="st FRAGMENT">Fragment</span> sold / auction
+      <span class="st INVALID">Invalid</span> breaks rules
+      <span class="st UNKNOWN">Unknown</span> blocked, retry later
+    </div>
+  </section>
+
+  <footer class="muted small">HandleHunt · results are best-effort signals, not guarantees.</footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import username_finder as uf  # noqa: E402
+from app import finder as uf  # noqa: E402
 
 
 def fake(routes):

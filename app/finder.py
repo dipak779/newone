@@ -3,9 +3,9 @@
 
 Pure standard library (Python 3.9+). Usage examples:
 
-    python username_finder.py money cash karma
-    python username_finder.py --random 30 --min-len 5 --max-len 7
-    python username_finder.py --file my_words.txt --platform telegram --out results.csv
+    python -m app.finder money cash karma
+    python -m app.finder --random 30 --min-len 5 --max-len 7
+    python -m app.finder --file my_words.txt --platform telegram --out results.csv
 
 Results are best-effort signals from public pages, not guarantees:
   AVAILABLE  - the public page/endpoint says nobody has it (may still be reserved/banned)

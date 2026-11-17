@@ -1,23 +1,39 @@
-# Username Finder
+# HandleHunt
 
-Checks short, word-style usernames (like `@money`, `@karma`, `@showoff`) on **Telegram** and **Instagram**.
-Pure Python 3.9+, no dependencies.
+A web portal for finding available short, one-word usernames (like `@karma`, `@therapy`, `@showoff`)
+on **Telegram** and **Instagram**.
 
-## Usage
+- Paste your own words, or generate random ones (length + style: plain / `getkarma` / `karmahq` / mixed)
+- Live results stream in per name and platform
+- Filter by *any free* / *free on both*, copy hits, export CSV
+- Star names to keep them in a saved list and re-scan them later
+
+## Run locally
 
 ```bash
-# check specific names
-python username_finder.py showoff manner therapy money cash save pleased karma
-
-# check 30 random words (5-7 letters) from words.txt
-python username_finder.py --random 30 --min-len 5 --max-len 7
-
-# your own list, Telegram only, show only hits, save to CSV
-python username_finder.py --file my_words.txt -p telegram --only-available -o hits.csv
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+# open http://localhost:8000   (API docs at /api/docs)
 ```
 
-Options: `--delay` (seconds between names, default 3), `--seed` (repeatable random picks),
-`-o results.json|.csv`, `--no-color`.
+Or with Docker:
+
+```bash
+docker build -t handlehunt . && docker run -p 8000:8000 handlehunt
+```
+
+It deploys to any host that runs a container or Python app (Render, Railway, Fly.io, a VPS).
+Use one server instance: the cache, throttle and rate limits live in memory.
+
+## Settings (environment variables)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MAX_NAMES_PER_SCAN` | 50 | names per scan |
+| `CHECKS_PER_HOUR_PER_IP` | 300 | checks per visitor per hour |
+| `CACHE_TTL_SECONDS` | 900 | how long results are reused |
+| `TELEGRAM_INTERVAL` | 0.7 | seconds between requests to Telegram (whole server) |
+| `INSTAGRAM_INTERVAL` | 3.0 | seconds between requests to Instagram (whole server) |
 
 ## Result meanings
 
@@ -25,20 +41,25 @@ Options: `--delay` (seconds between names, default 3), `--seed` (repeatable rand
 |---|---|
 | `AVAILABLE` | No public account found. Usually claimable, but may be reserved or banned. |
 | `TAKEN` | A user, bot, channel or group has it. |
-| `FRAGMENT` | Telegram name is sold/auctioned on fragment.com (buy it there, can't just claim it). |
-| `INVALID` | Breaks platform rules. **Telegram requires 5+ characters**, so `@cash`, `@save`, `@money`-style 4-letter names only exist via Fragment. |
-| `UNKNOWN` | Blocked or rate limited. Raise `--delay` and retry later. |
+| `FRAGMENT` | Telegram name is sold/auctioned on fragment.com. |
+| `INVALID` | Breaks platform rules. **Telegram requires 5+ characters**; 4-letter names exist only on Fragment. |
+| `UNKNOWN` | Blocked or rate limited; retry later. |
 
-## How it checks
+**Telegram** is checked via the public `t.me/<name>` page, then fragment.com.
+**Instagram** is checked via its public profile lookup, which rate limits anonymous traffic hard;
+from datacenter IPs you may see many `UNKNOWN`s. Always confirm a hit by claiming it in the app.
 
-- **Telegram:** `t.me/<name>` shows a profile title if the name is in use; otherwise fragment.com is checked for auctions/sales.
-- **Instagram:** the public `web_profile_info` endpoint returns 404 for unused names. Instagram rate limits
-  anonymous requests heavily, so keep the delay at a few seconds; you'll start seeing `UNKNOWN` (429) if you go too fast.
+## Command line
 
-Always confirm a hit by actually trying to set the username in the app.
+The checker also works without the web UI:
+
+```bash
+python -m app.finder showoff manner therapy money --only-available
+```
 
 ## Tests
 
 ```bash
+pip install -r requirements-dev.txt
 python -m pytest tests
 ```
