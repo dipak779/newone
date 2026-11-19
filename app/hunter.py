@@ -20,9 +20,10 @@ class Hunter:
                  interval: float = 60, batch: int = 5,
                  recheck_free: float = 6 * 3600, recheck_all: float = 7 * 86400,
                  recheck_unknown: float = 3600, seed: int = 7,
-                 block_after: int = 3, block_pause: float = 1800):
+                 block_after: int = 3, block_pause: float = 1800, shuffle: bool = True):
         self.pool = list(dict.fromkeys(pool))
-        random.Random(seed).shuffle(self.pool)
+        if shuffle:
+            random.Random(seed).shuffle(self.pool)
         self.check, self.store, self.platforms = check, store, platforms
         self.interval, self.batch = interval, batch
         self.recheck_free, self.recheck_all = recheck_free, recheck_all

@@ -31,7 +31,7 @@ async function refreshQuota() {
 // ---------- random generator
 $("#genBtn").addEventListener("click", async () => {
   const p = new URLSearchParams({
-    count: $("#rCount").value, min_len: $("#rMin").value, max_len: $("#rMax").value, style: $("#rStyle").value,
+    count: $("#rCount").value, min_len: $("#rMin").value, max_len: $("#rMax").value,
   });
   const res = await fetch("/api/words?" + p);
   if (!res.ok) return showError("Couldn't generate names — check the numbers.");

@@ -38,7 +38,7 @@ DB_PATH = os.getenv("DB_PATH", str(Path(__file__).resolve().parent.parent / "dat
 HUNT_ENABLED = os.getenv("HUNT_ENABLED", "1") == "1"
 HUNT_INTERVAL = float(os.getenv("HUNT_INTERVAL_SECONDS", "60"))
 HUNT_BATCH = int(os.getenv("HUNT_BATCH", "5"))
-HUNT_VARIANTS = os.getenv("HUNT_VARIANTS", "1") == "1"  # also hunt getX / Xhq style names
+HUNT_VARIANTS = os.getenv("HUNT_VARIANTS", "0") == "1"  # also hunt getX / Xhq style names (off: real words only)
 TG_API_ID = os.getenv("TG_API_ID", "")
 TG_API_HASH = os.getenv("TG_API_HASH", "")
 TG_CONFIRM_GAP = float(os.getenv("TG_CONFIRM_GAP", "10"))
@@ -147,8 +147,12 @@ def build(fetch: finder.Fetcher = finder.http_get, db_path: str = DB_PATH) -> No
     app.state.confirmer = make_confirmer(db_path)
     app.state.checker = Checker(fetch, store, app.state.confirmer)
     app.state.limiter = RateLimiter(CHECKS_PER_HOUR_PER_IP)
-    app.state.hunter = Hunter(hunt_pool(), app.state.checker.check, store, HUNT_PLATFORMS,
-                              interval=HUNT_INTERVAL, batch=HUNT_BATCH)
+    pool = hunt_pool()
+    if db_path != ":memory:":
+        store.prune_except(pool)  # forget names that are no longer in the word list (e.g. old getX/Xhq variants)
+    # words.txt is already ordered (your own words first), so don't shuffle it
+    app.state.hunter = Hunter(pool, app.state.checker.check, store, HUNT_PLATFORMS,
+                              interval=HUNT_INTERVAL, batch=HUNT_BATCH, shuffle=False)
 
 
 @asynccontextmanager

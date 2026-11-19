@@ -126,6 +126,15 @@ class Store:
                                   "(status='UNCONFIRMED' OR (status='AVAILABLE' AND detail != 'confirmed by Telegram'))")
             return cur.rowcount
 
+    def prune_except(self, keep: list[str]) -> int:
+        """Delete results for usernames not in `keep`."""
+        with self.lock, self.db:
+            self.db.execute("CREATE TEMP TABLE IF NOT EXISTS keep_names(username TEXT PRIMARY KEY)")
+            self.db.execute("DELETE FROM keep_names")
+            self.db.executemany("INSERT OR IGNORE INTO keep_names VALUES (?)", [(k,) for k in keep])
+            cur = self.db.execute("DELETE FROM checks WHERE username NOT IN (SELECT username FROM keep_names)")
+            return cur.rowcount
+
     def counts(self) -> dict[str, dict[str, int]]:
         out: dict[str, dict[str, int]] = {}
         with self.lock:

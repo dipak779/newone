@@ -130,3 +130,6 @@ footer { text-align: center; margin-top: 20px; }
 .find .pf.dim { color: var(--muted); padding: 1px 8px; border: 1px solid transparent; }
 .yn { font-weight: 600; font-size: 12px; white-space: nowrap; }
 .yn.yes { color: var(--green); } .yn.no { color: #a1a7b8; } .yn.wait { color: var(--muted); font-weight: 500; }
+.grid3.gen { margin: 0 0 12px; gap: 12px; }
+.grid3.gen label { color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
+@media (max-width: 720px) { .grid3.gen { grid-template-columns: repeat(3, 1fr); } }

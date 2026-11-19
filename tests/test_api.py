@@ -242,3 +242,22 @@ def test_confirmer_maps_telegram_errors(tmp_path):
     c._run = answer(flood)
     assert c.check("getelite")[0] == "UNKNOWN"
     assert "wait" in c.check("other")[1]  # paused: doesn't call Telegram again
+
+
+def test_word_list_is_real_words_only():
+    words = main.WORDS
+    assert words[:13] == "guys deed ominous half heck dreamed urgent craziest upcoming trolling embassy emotion wept".split()
+    assert all(w.isalpha() and w.islower() and 3 <= len(w) <= 10 for w in words)
+    for bad in ("getkarma", "karmahq", "john", "london", "lol"):
+        assert bad not in words
+    pool = main.hunt_pool()
+    assert pool == words  # no getX / Xhq variants by default
+
+
+def test_prune_except():
+    from app.store import Store
+    s = Store(":memory:")
+    s.save(finder.Result("getelite", "telegram", "TAKEN"))
+    s.save(finder.Result("embassy", "telegram", "TAKEN"))
+    assert s.prune_except(["embassy"]) == 1
+    assert s.counts()["telegram"] == {"TAKEN": 1}

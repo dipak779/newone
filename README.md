@@ -12,8 +12,9 @@ on **Telegram** and **Instagram**.
 
 ## The background hunter
 
-When the server starts, it begins working through ~3,000 candidates (the words in `app/words.txt` plus
-variants like `getkarma`, `karmahq`). Every minute it checks the next 5 names on both platforms and saves
+When the server starts, it works through `app/words.txt`: ~18,500 real, common English words
+(3-6 letters, plus well-known longer words like *craziest* or *embassy*; no names, places or made-up combos).
+The list is checked top to bottom, so put your favourite words at the top. Rebuild it with `python tools/build_words.py`. Every minute it checks the next 5 names on both platforms and saves
 the results in SQLite (`data/handlehunt.db`). Order of work:
 
 1. names never checked
@@ -90,7 +91,7 @@ Instagram blocks lookups from hosting servers like Render's, so Instagram is che
 | `HUNT_ENABLED` | 1 | run the background hunter |
 | `HUNT_INTERVAL_SECONDS` | 60 | time between hunter rounds |
 | `HUNT_BATCH` | 5 | names per round |
-| `HUNT_VARIANTS` | 1 | also hunt prefixed/suffixed variants |
+| `HUNT_VARIANTS` | 0 | also hunt prefixed/suffixed variants (getX, Xhq) |
 | `HUNT_PLATFORMS` | telegram,instagram | platforms the hunter checks |
 | `HELPER_TOKEN` | (unset) | admin password: enables /admin and the Instagram home helper |
 | `TG_API_ID`, `TG_API_HASH` | (unset) | enable Telegram confirmation (from my.telegram.org) |
