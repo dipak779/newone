@@ -133,3 +133,5 @@ footer { text-align: center; margin-top: 20px; }
 .grid3.gen { margin: 0 0 12px; gap: 12px; }
 .grid3.gen label { color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
 @media (max-width: 720px) { .grid3.gen { grid-template-columns: repeat(3, 1fr); } }
+#breakdown { margin: 4px 0 0; } #breakdown b { color: var(--text); }
+#breakdown b.ok { color: var(--green); } #breakdown b.warn { color: var(--amber); }

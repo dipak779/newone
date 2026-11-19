@@ -6,7 +6,8 @@ Rules
   - 7-10 letters: only well-known words (zipf >= MIN_ZIPF_LONG), e.g. craziest, upcoming, embassy
   - must be a dictionary word or a normal form of one (guys, dreamed, craziest, trolling)
   - names/places are dropped (first-name + country/city lists) unless very common words (hope, grace), as is profanity
-Order: SEEDS first, then 5-6 letters, 7-10 letters, 3-4 letters (Telegram needs 5+, so those are Instagram-only).
+Order (most likely to be free first): SEEDS, word forms (dreamed, craziest, trolling), other 7-10 letter
+words (ominous, embassy), plain 5-6 letter words, then 3-4 letters (Telegram needs 5+: Instagram-only).
 
     pip install wordfreq english-words && python tools/build_words.py
 """
@@ -81,7 +82,11 @@ def main():
             words.append(w)
     words = sorted(set(words))
     rng = random.Random(42)
-    tiers = [[w for w in words if 5 <= len(w) <= 6], [w for w in words if len(w) >= 7],
+    forms = ("ed", "est", "ing", "ier", "ies")
+    is_form = lambda w: len(w) >= 5 and w.endswith(forms)
+    tiers = [[w for w in words if is_form(w)],
+             [w for w in words if len(w) >= 7 and not is_form(w)],
+             [w for w in words if 5 <= len(w) <= 6 and not is_form(w)],
              [w for w in words if len(w) <= 4]]
     for t in tiers:
         rng.shuffle(t)
@@ -89,7 +94,8 @@ def main():
     header = ("# Real, common English words (built by tools/build_words.py). One per line, # = comment.\n"
               "# Order matters: the hunter checks from the top. Add your own words near the top.\n")
     OUT.write_text(header + "\n".join(ordered) + "\n", encoding="utf-8")
-    print(f"{len(ordered)} words -> {OUT}  (5-6: {len(tiers[0])}, 7-10: {len(tiers[1])}, 3-4: {len(tiers[2])})")
+    print(f"{len(ordered)} words -> {OUT}  (forms: {len(tiers[0])}, 7-10: {len(tiers[1])}, "
+          f"5-6: {len(tiers[2])}, 3-4: {len(tiers[3])})")
 
 
 if __name__ == "__main__":

@@ -27,6 +27,14 @@
           Object.entries(h.paused || {}).map(([p, sec]) =>
             ` · ⏸ ${p[0].toUpperCase() + p.slice(1)} is blocking requests, retrying in ${Math.ceil(sec / 60)} min`).join("")
         : "Background hunter is off (set HUNT_ENABLED=1). Showing names found by scans.";
+      const tg = (h.counts && h.counts.telegram) || {};
+      const n = (k) => tg[k] || 0;
+      const checked = Object.values(tg).reduce((a, b) => a + b, 0);
+      el("#breakdown").innerHTML = checked
+        ? `Telegram so far: <b>${n("TAKEN")}</b> taken · <b>${n("FRAGMENT")}</b> for sale on Fragment · ` +
+          `<b>${n("INVALID")}</b> reserved / too short · <b class="ok">${n("AVAILABLE")}</b> confirmed free` +
+          (n("UNKNOWN") + n("UNCONFIRMED") ? ` · <b class="warn">${n("UNKNOWN") + n("UNCONFIRMED")}</b> couldn't be confirmed` : "")
+        : "";
       if (h.helper && h.helper.enabled) {
         const on = h.helper.last_seen_at && Date.now() / 1000 - h.helper.last_seen_at < 300;
         el("#hunterInfo").textContent += on ? " · 🏠 Instagram helper online" : " · 🏠 Instagram helper offline";

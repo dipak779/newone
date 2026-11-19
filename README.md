@@ -90,7 +90,7 @@ Instagram blocks lookups from hosting servers like Render's, so Instagram is che
 | `INSTAGRAM_INTERVAL` | 3.0 | seconds between requests to Instagram (whole server) |
 | `HUNT_ENABLED` | 1 | run the background hunter |
 | `HUNT_INTERVAL_SECONDS` | 60 | time between hunter rounds |
-| `HUNT_BATCH` | 5 | names per round |
+| `HUNT_BATCH` | 10 | names per round |
 | `HUNT_VARIANTS` | 0 | also hunt prefixed/suffixed variants (getX, Xhq) |
 | `HUNT_PLATFORMS` | telegram,instagram | platforms the hunter checks |
 | `HELPER_TOKEN` | (unset) | admin password: enables /admin and the Instagram home helper |

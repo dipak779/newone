@@ -19,6 +19,6 @@ services:
       - key: HUNT_INTERVAL_SECONDS
         value: "60"
       - key: HUNT_BATCH
-        value: "5"
+        value: "10"
       - key: HUNT_PLATFORMS
         value: telegram,instagram

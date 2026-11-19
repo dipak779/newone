@@ -37,7 +37,7 @@ MIN_INTERVAL = {
 DB_PATH = os.getenv("DB_PATH", str(Path(__file__).resolve().parent.parent / "data" / "handlehunt.db"))
 HUNT_ENABLED = os.getenv("HUNT_ENABLED", "1") == "1"
 HUNT_INTERVAL = float(os.getenv("HUNT_INTERVAL_SECONDS", "60"))
-HUNT_BATCH = int(os.getenv("HUNT_BATCH", "5"))
+HUNT_BATCH = int(os.getenv("HUNT_BATCH", "10"))
 HUNT_VARIANTS = os.getenv("HUNT_VARIANTS", "0") == "1"  # also hunt getX / Xhq style names (off: real words only)
 TG_API_ID = os.getenv("TG_API_ID", "")
 TG_API_HASH = os.getenv("TG_API_HASH", "")
